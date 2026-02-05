@@ -25,5 +25,5 @@ class SetPasswordView(APIView):
             user = request.user
             user.set_password(serializer.validated_data['new_password'])
             user.save()
-            return Response({'message': 'Parol sátiyli ózgertildi!'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Parol tabıslı ózgertildi!'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

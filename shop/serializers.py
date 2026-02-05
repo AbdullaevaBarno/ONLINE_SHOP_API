@@ -8,6 +8,7 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'slug', 'children']
+        
 
     def get_children(self, obj):
         children = obj.children.all()
