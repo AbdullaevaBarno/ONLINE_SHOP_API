@@ -10,27 +10,6 @@ from .filters import ProductFilter
 from .models import *
 from .serializers import *
 
-class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly] 
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        product_id = self.request.data.get("product")
-        product = get_object_or_404(Product, id=product_id)
-
-        satip_alingan = OrderItem.objects.filter(
-            order__user=user, 
-            product=product, 
-            order__status__in=["tolendi", "jiberildi"]
-        ).exists()
-
-        if not satip_alingan:
-            raise ValidationError("Siz bul ónimdi satıp alǵanıńızdan keyin ǵana pikir qaldıra alasız!")
-
-        serializer.save(user=user, product=product)
-
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().select_related('category')
     serializer_class = ProductSerializer
@@ -116,4 +95,24 @@ class OrderViewSet(viewsets.ModelViewSet):
             cart_items.delete()
 
         return Response({"success": "Buyırtpa rásmiylestirildi", "order_id": order.id}, status=201)
-    
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly] 
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        product_id = self.request.data.get("product")
+        product = get_object_or_404(Product, id=product_id)
+
+        satip_alingan = OrderItem.objects.filter(
+            order__user=user, 
+            product=product, 
+            order__status__in=["tolendi", "jiberildi"]
+        ).exists()
+
+        if not satip_alingan:
+            raise ValidationError("Siz bul ónimdi satıp alǵanıńızdan keyin ǵana pikir qaldıra alasız!")
+
+        serializer.save(user=user, product=product) 
