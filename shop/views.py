@@ -1,7 +1,9 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, status, permissions, filters
+from rest_framework import viewsets, status, permissions, filters, mixins
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
@@ -10,12 +12,21 @@ from .filters import ProductFilter
 from .models import *
 from .serializers import *
 
+class CategoryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet):
+    queryset = Category.objects.filter(parent__isnull=True).prefetch_related('children')
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug']
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().select_related('category')
     serializer_class = ProductSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = ProductFilter
     search_fields = ['name', 'description']
+    ordering_fields = ['price', 'created_at']
+    http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -28,9 +39,18 @@ class CartViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user).prefetch_related('items__product')
+    
+    @action(detail=False, methods=['get'])
+    def my_cart(self, request):
+        """Paydalanıwshınıń sebetin kórsetiw"""
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        serializer = self.get_serializer(cart)
+        return Response(serializer.data)
 
+    @extend_schema(request=CartAddSerializer, responses=CartSerializer)
     @action(detail=False, methods=['post'])
     def add(self, request):
+        """Sebetke zat qosıw"""
         product_id = request.data.get('product_id')
         quantity = int(request.data.get('quantity', 1))
         product = get_object_or_404(Product, id=product_id)
@@ -44,6 +64,14 @@ class CartViewSet(viewsets.ModelViewSet):
         item.save()
         return Response({"success": "Ónim sebetke qosıldı"}, status=201)
 
+class CartItemViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, GenericViewSet):
+    serializer_class = CartItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['patch', 'delete'] # klient tek óshiriwi yamasa sanın ózgertiwi múmkin
+
+    def get_queryset(self):
+        return CartItem.objects.filter(cart__user=self.request.user)
+
 class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderSerializer
@@ -51,6 +79,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('order_items__product')
 
+    @extend_schema(request=CheckoutSerializer)
     @action(detail=False, methods=['post'])
     def checkout(self, request):
         serializer = CheckoutSerializer(data=request.data)
@@ -58,11 +87,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         user = request.user
         address = serializer.validated_data['address']
-        cart_item_ids = serializer.validated_data.get('cart_item_ids')
+        cart_item_ids = serializer.validated_data.get('cart_item_ids') 
         
         cart = get_object_or_404(Cart, user=user)
 
         with transaction.atomic():
+            # SQL hám Filterlew
             if cart_item_ids:
                 cart_items = cart.items.select_related('product').select_for_update(of=('product',)).filter(id__in=cart_item_ids)
             else:
@@ -71,9 +101,13 @@ class OrderViewSet(viewsets.ModelViewSet):
             if not cart_items.exists():
                 return Response({"error": "Satıp alıw ushın tovar saylanbaǵan"}, status=400)
 
-            total_price = sum(item.get_total_price() for item in cart_items)
-
-            order = Order.objects.create(user=user, total_price=total_price, address=address, status="kutilmekte")
+            # Order jaratıw (Response-da kóriniwi ushın aldın jaratamız)
+            order = Order.objects.create(
+                user=user, 
+                total_price=sum(item.get_total_price() for item in cart_items), 
+                address=address, 
+                status="kutilmekte"
+            )
 
             order_items_to_create = []
             for item in cart_items:
@@ -91,15 +125,15 @@ class OrderViewSet(viewsets.ModelViewSet):
                 ))
 
             OrderItem.objects.bulk_create(order_items_to_create)
+            cart_items.delete() # Sebet tazalandı
 
-            cart_items.delete()
-
-        return Response({"success": "Buyırtpa rásmiylestirildi", "order_id": order.id}, status=201)
-
+        return Response({"success": "Buyırtpa rásmiylestirildi", "order": OrderSerializer(order).data }, status=201)
+        
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly] 
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    http_method_names = ['get', 'post', 'patch', 'delete'] 
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -109,7 +143,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         satip_alingan = OrderItem.objects.filter(
             order__user=user, 
             product=product, 
-            order__status__in=["tolendi", "jiberildi"]
+            order__status__in=["tolendi", "jiberildi"] 
         ).exists()
 
         if not satip_alingan:

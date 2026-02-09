@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from django.utils.text import slugify
 from .models import Category, Product, Cart, CartItem, Order, OrderItem, Review
 
@@ -27,30 +28,42 @@ class ProductSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product_data = ProductSerializer(source='product', read_only=True)
-    total_price = serializers.ReadOnlyField(source='get_total_price')
+    product = ProductSerializer(read_only=True)
+    
+    # Jaziw(POST/PUT) ushın tek ónimniń ID-si
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), 
+        source="product", 
+        write_only=True
+    )
 
     class Meta:
         model = CartItem
-        fields = ['id', 'product', 'product_data', 'quantity', 'total_price']
+        fields = ["id", "product", "product_id", "quantity", "total_price"]
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
-    grand_total = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
+
 
     class Meta:
         model = Cart
-        fields = ['id', 'user', 'items', 'grand_total']
+        fields = ['id', 'user', 'items', 'total_price']
 
-    def get_grand_total(self, obj):
+    @extend_schema_field(serializers.DecimalField(max_digits=10, decimal_places=2))
+    def get_total_price(self, obj):
         return sum(item.get_total_price() for item in obj.items.all())
+    
+class CartAddSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(help_text="Ónimniń ID-si")
+    quantity = serializers.IntegerField(default=1, min_value=1, help_text="Neshe dana qosıw kerek? (Minimal 1)")
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.ReadOnlyField(source='product.name')
+    product = ProductSerializer(read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_name', 'price', 'quantity']
+        fields = ['id', 'product', 'price', 'quantity']
 
 class OrderSerializer(serializers.ModelSerializer):
     order_items = OrderItemSerializer(many=True, read_only=True)
