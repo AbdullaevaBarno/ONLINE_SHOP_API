@@ -7,7 +7,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
-from .filters import ProductFilter
+from .filters import ProductFilter, ReviewFilter, CategoryFilter
 
 from .models import *
 from .serializers import *
@@ -16,7 +16,8 @@ class CategoryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericV
     queryset = Category.objects.filter(parent__isnull=True).prefetch_related('children')
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    filterset_class = CategoryFilter
     search_fields = ['name', 'slug']
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -79,7 +80,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('order_items__product')
 
-    @extend_schema(request=CheckoutSerializer)
+    @extend_schema(request=CheckoutSerializer, responses=OrderSerializer)
     @action(detail=False, methods=['post'])
     def checkout(self, request):
         serializer = CheckoutSerializer(data=request.data)
@@ -99,9 +100,10 @@ class OrderViewSet(viewsets.ModelViewSet):
                 cart_items = cart.items.select_related('product').select_for_update(of=('product',)).all()
 
             if not cart_items.exists():
-                return Response({"error": "Satıp alıw ushın tovar saylanbaǵan"}, status=400)
+                return Response({"error": "Satıp alıw ushın tovar saylanbaǵan"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-            # Order jaratıw (Response-da kóriniwi ushın aldın jaratamız)
+            # Order jaratıw, responseda kóriniwi ushın aldın jaratamız
             order = Order.objects.create(
                 user=user, 
                 total_price=sum(item.get_total_price() for item in cart_items), 
@@ -127,12 +129,15 @@ class OrderViewSet(viewsets.ModelViewSet):
             OrderItem.objects.bulk_create(order_items_to_create)
             cart_items.delete() # Sebet tazalandı
 
-        return Response({"success": "Buyırtpa rásmiylestirildi", "order": OrderSerializer(order).data }, status=201)
+        return Response({"success": "Buyırtpa rásmiylestirildi",
+                          "order": OrderSerializer(order).data },
+                            status=status.HTTP_201_CREATED)
         
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    filterset_class = ReviewFilter
     http_method_names = ['get', 'post', 'patch', 'delete'] 
 
     def perform_create(self, serializer):
@@ -141,10 +146,10 @@ class ReviewViewSet(viewsets.ModelViewSet):
         product = get_object_or_404(Product, id=product_id)
 
         satip_alingan = OrderItem.objects.filter(
-            order__user=user, 
-            product=product, 
-            order__status__in=["tolendi", "jiberildi"] 
-        ).exists()
+        order__user=user, 
+        product=product, 
+        order__status__in=["tolendi", "jiberildi"] 
+    ).exists()
 
         if not satip_alingan:
             raise ValidationError("Siz bul ónimdi satıp alǵanıńızdan keyin ǵana pikir qaldıra alasız!")

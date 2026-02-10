@@ -82,3 +82,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['id', 'user_name', 'product', 'text', 'rating', 'created_at']
+
+
+    extra_kwargs = {
+            'rating': {'help_text': '1 den 5 ke shekem baha beriń'}
+        }

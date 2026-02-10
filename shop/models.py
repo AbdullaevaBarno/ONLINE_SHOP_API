@@ -73,8 +73,13 @@ class Notification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Review(models.Model):
-    RATING_CHOICES = [(1, '1'), (2, '2'), (3, '3'), (4, '4'), (5, '5')]
-
+    RATING_CHOICES = [
+        (1, '1 - Jaman'),
+        (2, '2 - Qanaatlandırarsız'),
+        (3, '3 - Jaqsı'),
+        (4, '4 - Júdá jaqsı'),
+        (5, '5 - Ála'),
+    ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reviews')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     text = models.TextField(blank=True, null=True)

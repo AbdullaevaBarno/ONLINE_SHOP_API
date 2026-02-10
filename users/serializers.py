@@ -10,8 +10,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('first_name', 
-    'last_name', 'username', 'password', 'confirm_password', 'email', 'phone_number', 'address')
+        fields = ('first_name', 'last_name', 'username', 'password', 'confirm_password', 'email', 'phone_number', 'address')
 
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
@@ -27,7 +26,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone_number', 'address']
-        read_only_fields = ['id', 'username']
+        read_only_fields = ['id', 'phone_number']
 
 class SetPasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
