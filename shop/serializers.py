@@ -30,7 +30,6 @@ class ProductSerializer(serializers.ModelSerializer):
 class CartItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     
-    # Jaziw(POST/PUT) ushın tek ónimniń ID-si
     product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(), 
         source="product", 

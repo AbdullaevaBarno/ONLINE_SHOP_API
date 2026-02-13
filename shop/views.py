@@ -12,38 +12,64 @@ from .filters import ProductFilter, ReviewFilter, CategoryFilter
 from .models import *
 from .serializers import *
 
+
+#Katalog
+@extend_schema(tags=['Categories'])
 class CategoryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet):
-    queryset = Category.objects.filter(parent__isnull=True).prefetch_related('children')
+    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     filterset_class = CategoryFilter
+    pagination_class = None
     search_fields = ['name', 'slug']
 
+    def get_queryset(self):
+        queryset = Category.objects.all().prefetch_related('children')
+        
+        parent_id = self.request.query_params.get('parent_id')
+        search = self.request.query_params.get('search')
+
+        if parent_id or search:
+            return queryset
+        
+        return queryset.filter(parent__isnull=True)
+
+#Ónimler
+@extend_schema(tags=['Product'])
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().select_related('category')
     serializer_class = ProductSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = ProductFilter
-    search_fields = ['name', 'description']
-    ordering_fields = ['price', 'created_at']
-    http_method_names = ['get', 'post', 'patch', 'delete']
+    search_fields = ['name']
+    ordering_fields = ['price', 'name', 'created_at']
+    ordering = ['-created_at']
+    http_method_names = ['get']
 
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            return [permissions.AllowAny()]
-        return [permissions.IsAdminUser()]
+    class IsAdminOrReadOnly(permissions.BasePermission):
 
-class CartViewSet(viewsets.ModelViewSet):
+        def has_permission(self, request, view):
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            return request.user and request.user.is_staff
+
+    permission_classes = [IsAdminOrReadOnly]
+
+
+# Sebet
+@extend_schema(tags=['Cart'])
+class CartViewSet(GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CartSerializer
+    
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user).prefetch_related('items__product')
     
     @action(detail=False, methods=['get'])
     def my_cart(self, request):
-        """Paydalanıwshınıń sebetin kórsetiw"""
+        #Paydalanıwshı sebetin kórsetiw
         cart, _ = Cart.objects.get_or_create(user=request.user)
         serializer = self.get_serializer(cart)
         return Response(serializer.data)
@@ -51,7 +77,7 @@ class CartViewSet(viewsets.ModelViewSet):
     @extend_schema(request=CartAddSerializer, responses=CartSerializer)
     @action(detail=False, methods=['post'])
     def add(self, request):
-        """Sebetke zat qosıw"""
+        #sebetke zat qosıw
         product_id = request.data.get('product_id')
         quantity = int(request.data.get('quantity', 1))
         product = get_object_or_404(Product, id=product_id)
@@ -65,15 +91,21 @@ class CartViewSet(viewsets.ModelViewSet):
         item.save()
         return Response({"success": "Ónim sebetke qosıldı"}, status=201)
 
+
+# Sebet ishindegi elementleri
+@extend_schema(tags=['Cart']) 
 class CartItemViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, GenericViewSet):
     serializer_class = CartItemSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['patch', 'delete'] # klient tek óshiriwi yamasa sanın ózgertiwi múmkin
+    http_method_names = ['get', 'patch', 'delete'] # klient tek, kóriwi yaki óshiriwi yamasa sanın ózgertiwi múmkin
 
     def get_queryset(self):
         return CartItem.objects.filter(cart__user=self.request.user)
 
-class OrderViewSet(viewsets.ModelViewSet):
+
+# Buyırtpalar
+@extend_schema(tags=['Orders & Checkout'])
+class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderSerializer
 
@@ -103,7 +135,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Satıp alıw ushın tovar saylanbaǵan"},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Order jaratıw, responseda kóriniwi ushın aldın jaratamız
+            # Order jaratıw
             order = Order.objects.create(
                 user=user, 
                 total_price=sum(item.get_total_price() for item in cart_items), 
@@ -127,18 +159,51 @@ class OrderViewSet(viewsets.ModelViewSet):
                 ))
 
             OrderItem.objects.bulk_create(order_items_to_create)
-            cart_items.delete() # Sebet tazalandı
+            cart_items.delete() 
 
         return Response({"success": "Buyırtpa rásmiylestirildi",
                           "order": OrderSerializer(order).data },
                             status=status.HTTP_201_CREATED)
-        
+    
+    @extend_schema(request=None, responses=OrderSerializer)
+    @action(detail=True, methods=['post'])
+    def t_m(self, request, pk=None):
+        order = self.get_object()
+
+        if order.status == 'tólendi':
+            return Response(
+                {"error": "Bul buyırtpa aldın tólengen. Qayta tólem qılıw múmkin emes."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if order.status == 'biykar_etildi':
+            return Response(
+                {"error": "Biykar etilgen buyırtpa ushın tólem qabıllanbaydı."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        order.status = 'tólendi'
+        order.save()
+
+        return Response({
+            "message": "Tólem tabıslı pitti!",
+            "order_details": OrderSerializer(order).data
+        }, status=status.HTTP_200_OK)
+
+
+# Pikirler
+@extend_schema(tags=['Reviews'])
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filterset_class = ReviewFilter
     http_method_names = ['get', 'post', 'patch', 'delete'] 
+
+    class IsOwnerOrReadOnly(permissions.BasePermission):  
+        def has_object_permission(self, request, view, obj):
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            return obj.user == request.user
+
+    permission_classes = [IsOwnerOrReadOnly]
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -148,7 +213,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         satip_alingan = OrderItem.objects.filter(
         order__user=user, 
         product=product, 
-        order__status__in=["tolendi", "jiberildi"] 
+        order__status__in=["tólendi", "jiberildi"] 
     ).exists()
 
         if not satip_alingan:

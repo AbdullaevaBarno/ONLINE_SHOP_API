@@ -26,6 +26,9 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
 
     path('api/shop/', include('shop.urls')),
+    
+    path('api/tg_bot/', include('tg_bot.urls')),
+
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
 

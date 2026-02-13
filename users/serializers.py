@@ -7,20 +7,26 @@ class RegisterSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     confirm_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    
+
 
     class Meta:
         model = User
         fields = ('first_name', 'last_name', 'username', 'password', 'confirm_password', 'email', 'phone_number', 'address')
 
     def validate(self, attrs):
-        if attrs['password'] != attrs['confirm_password']:
-            raise ValidationError({"confirm_password": "Paroller sáykes kelmedi!"})
+    
+        if attrs.get('password') != attrs.get('confirm_password'):
+            raise ValidationError({'confirm_password':'Paroller saykes kelmedi!'})
+        
+        attrs.pop('confirm_password', None)
         return attrs
-
+    
     def create(self, validated_data):
-        validated_data.pop('confirm_password')
-        user = User.objects.create_user(**validated_data, role='client')
-        return user
+        return User.objects.create_user(**validated_data)
+        
+
+
     
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,3 +42,6 @@ class SetPasswordSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['confirm_password']:
             raise ValidationError({'confirm_password': 'Paroller sáykes kelmeydi!'})
         return attrs
+    
+
+
