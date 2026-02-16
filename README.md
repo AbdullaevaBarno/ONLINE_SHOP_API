@@ -11,35 +11,42 @@ Konteynerizaciya: Docker & Docker-compose
 
 Proektti Iske Túsiriw (Instrukciya)
 Kompyuterińizde Docker ornatılǵan bolıwı shárt!
-```github.com/AbdullaevaBarno/ONLINE_SHOP_API.git
-cd ONLINE_SHOP_API```
+```
+github.com/AbdullaevaBarno/ONLINE_SHOP_API.git
+cd ONLINE_SHOP_API
+```
 
 2. Ortalıqtı (.env) sazlaw
 Tiykarǵı papkada .env faylın jaratıń hám tómendegi maǵlıwmatlardı kiritiń:
-```SECRET_KEY=super-secret-key-2026
+```
+SECRET_KEY=super-secret-key-2026
 DEBUG=True
 DB_HOST=db
 POSTGRES_DB=online_dukan
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=adminpass
-TELEGRAM_BOT_TOKEN=(Siziń bot tokenińiz)```
-
+TELEGRAM_BOT_TOKEN=(Siziń bot tokenińiz)
+```
 3. Docker-di iske túsiriw
-```docker-compose up --build -d```
-
+```
+docker-compose up --build -d
+```
 4. Migraciyalarnı qollanıw hám Admin jaratıw
-```# Bazanı jıynaw
+# Bazanı jıynaw
+```
 docker-compose exec web python manage.py migrate
-
+```
 # Bazanı test tovarları menen toltırıw
+```
 docker-compose exec web python populate_db.py
-
+```
 # Admin (Superuser) jaratıw
-docker-compose exec web python manage.py createsuperuser```
-
+```
+docker-compose exec web python manage.py createsuperuser
+```
 5. API Endpointler (Hújjetlestiriw)
 Server iske túskennen keyin, barlıq mánzillerdi mına siltemeler arqalı kóre alasız:
-Swagger UI (Interaktiv): http://127.0.0.1:8000/swagger/
+Swagger UI: http://127.0.0.1:8000/swagger/
 
 Tiykarǵı Endpointler Dizimi
    Paydalanıwshılar hám Avtorizaciya 
