@@ -162,6 +162,7 @@ class TelegramWebhookView(APIView):
 #TG Login 
 @extend_schema(tags=['Telegram Bot Authentication'])
 class LoginWithCodeView(APIView):
+    serializer_class = TelegramLoginSerializer
     authentication_classes = []
     permission_classes = []
 

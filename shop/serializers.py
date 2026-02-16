@@ -10,11 +10,15 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'slug', 'children']
         
-
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_children(self, obj):
         children = obj.children.all()
-        return CategorySerializer(children, many=True).data
-
+        
+        if children.exists():
+            return CategorySerializer(children, many=True).data
+        
+        return []
+    
 class ProductSerializer(serializers.ModelSerializer):
     category_data = CategorySerializer(source='category', read_only=True)
     

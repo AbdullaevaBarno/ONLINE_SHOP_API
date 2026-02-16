@@ -27,12 +27,9 @@ class CategoryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericV
     def get_queryset(self):
         queryset = Category.objects.all().prefetch_related('children')
         
-        parent_id = self.request.query_params.get('parent_id')
-        search = self.request.query_params.get('search')
+        if self.action == 'retrieve':
+            return queryset 
 
-        if parent_id or search:
-            return queryset
-        
         return queryset.filter(parent__isnull=True)
 
 #Ónimler
@@ -60,6 +57,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 # Sebet
 @extend_schema(tags=['Cart'])
 class CartViewSet(GenericViewSet):
+    queryset = Cart.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CartSerializer
     
@@ -95,9 +93,10 @@ class CartViewSet(GenericViewSet):
 # Sebet ishindegi elementleri
 @extend_schema(tags=['Cart']) 
 class CartItemViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, GenericViewSet):
+    queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'patch', 'delete'] # klient tek, kóriwi yaki óshiriwi yamasa sanın ózgertiwi múmkin
+    http_method_names = ['get', 'patch', 'delete'] #klient tek, kóriwi yaki óshiriwi yamasa sanın ózgertiwi múmkin
 
     def get_queryset(self):
         return CartItem.objects.filter(cart__user=self.request.user)
@@ -106,10 +105,13 @@ class CartItemViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, Generic
 # Buyırtpalar
 @extend_schema(tags=['Orders & Checkout'])
 class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet):
+    queryset = Order.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False): #haqıyqıy adam emes bolsa
+            return Order.objects.none()
         return Order.objects.filter(user=self.request.user).prefetch_related('order_items__product')
 
     @extend_schema(request=CheckoutSerializer, responses=OrderSerializer)
@@ -135,7 +137,6 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericView
                 return Response({"error": "Satıp alıw ushın tovar saylanbaǵan"},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Order jaratıw
             order = Order.objects.create(
                 user=user, 
                 total_price=sum(item.get_total_price() for item in cart_items), 
@@ -192,7 +193,7 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericView
 # Pikirler
 @extend_schema(tags=['Reviews'])
 class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.all()
+    queryset = Review.objects.all().select_related('user','product')
     serializer_class = ReviewSerializer
     filterset_class = ReviewFilter
     http_method_names = ['get', 'post', 'patch', 'delete'] 
@@ -203,7 +204,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
                 return True
             return obj.user == request.user
 
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
 
     def perform_create(self, serializer):
         user = self.request.user

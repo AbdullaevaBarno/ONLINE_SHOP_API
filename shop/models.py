@@ -70,7 +70,7 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"{self.order.id}"
+     return f"Order {self.id} - {self.user.username}"
 
 
 class Review(models.Model):
