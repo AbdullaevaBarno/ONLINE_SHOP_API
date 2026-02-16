@@ -30,8 +30,8 @@ class UsersConfig(AppConfig):
                 response = requests.post(url, json={"url": webhook_url}, timeout=5)
                 
                 if response.status_code == 200:
-                    print(f"🚀 [AUTO-BOT] Webhook sátiyli jańalandı: {webhook_url}")
+                    print(f" [AUTO-BOT] Webhook tabıslı jańalandı: {webhook_url}")
                 else:
-                    print(f"⚠️ [AUTO-BOT] Webhook ornatılmadı: {response.text}")
+                    print(f" [AUTO-BOT] Webhook ornatılmadı: {response.text}")
         except Exception as e:
             print(f" [AUTO-BOT] Webhook Error: {e}")
